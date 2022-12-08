@@ -2,8 +2,10 @@ import torch
 import utils as u
 import logger
 import time
+from tqdm import tqdm
 import pandas as pd
 import numpy as np
+
 
 class Trainer():
     def __init__(self,args, splitter, gcn, classifier, comp_loss, dataset, num_classes):
@@ -253,15 +255,18 @@ class Trainer_new():
 
     def train(self):
         self.tr_step = 0
-        best_eval_valid = 0
+        best_eval_valid = None
         eval_valid = 0
         epochs_without_impr = 0
 
-        for e in range(self.args.num_epochs):
+        for e in tqdm(range(self.args.num_epochs)):
             eval_train, nodes_embs = self.run_epoch(self.splitter.train, e, 'TRAIN', grad = True)
+            print("epoch", e, 'eval_train', eval_train)
             if len(self.splitter.dev)>0 and e>self.args.eval_after_epochs:
                 eval_valid, _ = self.run_epoch(self.splitter.dev, e, 'VALID', grad = False)
-                if eval_valid>best_eval_valid:
+                print('eval_valid', eval_valid)
+                # raise
+                if best_eval_valid is None or eval_valid > best_eval_valid:
                     best_eval_valid = eval_valid
                     epochs_without_impr = 0
                     print ('### w'+str(self.args.rank)+') ep '+str(e)+' - Best valid measure:'+str(eval_valid))
@@ -287,6 +292,15 @@ class Trainer_new():
             log_interval=1
         self.logger.log_epoch_start(epoch, len(split), set_name, minibatch_log_interval=log_interval)
 
+        if set_name == "TRAIN":
+            cur_idx = self.splitter.train_idx
+        elif set_name == "VALID":
+            cur_idx = self.splitter.dev_idx
+        elif set_name == "TEST":
+            cur_idx = self.splitter.test_idx
+        else:
+            raise ValueError("Unknown set name: {}".format(set_name))
+
         torch.set_grad_enabled(grad)
         for s in split:
             if self.tasker.is_static:
@@ -297,14 +311,23 @@ class Trainer_new():
             predictions, nodes_embs = self.predict(s.hist_adj_list,
                                                    s.hist_ndFeats_list,
                                                    s.label_sp['idx'],
-                                                   s.node_mask_list)
+                                                   s.node_mask_list, set_name)
+            # print('predictions before', predictions.shape)
+            if self.args.task == "node_reg":
+                predictions = predictions[cur_idx].squeeze()
+                # nodes_embs = nodes_embs[cur_idx]
+                # print("labels before", s.label_sp['vals'], s.label_sp['vals'].shape)
+                labels = s.label_sp['vals'][cur_idx].float().squeeze()
+            else:
+                labels = s.label_sp['vals']
+            # print('predictions after', predictions.shape, labels.shape)
 
-            loss = self.comp_loss(predictions,s.label_sp['vals'])
+            loss = self.comp_loss(predictions, labels)
             # print(loss)
             if set_name in ['TEST', 'VALID'] and self.args.task == 'link_pred':
-                self.logger.log_minibatch(predictions, s.label_sp['vals'], loss.detach(), adj = s.label_sp['idx'])
+                self.logger.log_minibatch(predictions, labels, loss.detach(), adj = s.label_sp['idx'])
             else:
-                self.logger.log_minibatch(predictions, s.label_sp['vals'], loss.detach())
+                self.logger.log_minibatch(predictions, labels, loss.detach())
             if grad:
                 self.optim_step(loss)
 
@@ -312,24 +335,32 @@ class Trainer_new():
         eval_measure = self.logger.log_epoch_done()
         return eval_measure, nodes_embs
 
-    def predict(self, hist_adj_list, hist_ndFeats_list, node_indices, mask_list):
-        print("hist_adj_list", hist_adj_list)
-        print("hist_ndFeats_list", hist_ndFeats_list)
-        print("node_indices", node_indices)
-        print("mask_list", mask_list)
-        # raise
+    def predict(self, hist_adj_list, hist_ndFeats_list, node_indices, mask_list, role="TRAIN"):
+        # print("hist_adj_list", hist_adj_list)
+        # print("hist_ndFeats_list", hist_ndFeats_list)
+        # print("node_indices", node_indices)
+        # print("mask_list", mask_list)
         nodes_embs = self.gcn(hist_adj_list,
                               hist_ndFeats_list,
                               mask_list)
-        raise
+        # print("node_embs", nodes_embs, nodes_embs.size())
 
         predict_batch_size = 100000
         gather_predictions=[]
-        for i in range(1 +(node_indices.size(1)//predict_batch_size)):
-            cls_input = self.gather_node_embs(nodes_embs, node_indices[:, i*predict_batch_size:(i+1)*predict_batch_size])
-            predictions = self.classifier(cls_input)
-            gather_predictions.append(predictions)
-        gather_predictions=torch.cat(gather_predictions, dim=0)
+        # print("node_indices", node_indices.size(1))
+        if self.args.task != "node_reg":
+            for i in range(1 +(node_indices.size(1)//predict_batch_size)):
+                cls_input = self.gather_node_embs(nodes_embs, node_indices[:, i*predict_batch_size:(i+1)*predict_batch_size])
+                predictions = self.classifier(cls_input)
+                gather_predictions.append(predictions)
+        else:
+            n_nodes = nodes_embs.size(0)
+            for i in range(1 +(n_nodes//predict_batch_size)):
+                cls_input = nodes_embs[i*predict_batch_size:(i+1)*predict_batch_size]
+                predictions = self.classifier(cls_input)
+                gather_predictions.append(predictions)
+        gather_predictions = torch.cat(gather_predictions, dim=0)
+        # print("gather_predictions", gather_predictions, gather_predictions.size())
         return gather_predictions, nodes_embs
 
     def gather_node_embs(self,nodes_embs,node_indices):
@@ -353,7 +384,7 @@ class Trainer_new():
 
     def prepare_sample(self,sample):
         sample = u.Namespace(sample)
-        print("sample.hist_adj_list", len(sample.hist_adj_list))
+        # print("sample.hist_adj_list", len(sample.hist_adj_list))
         for i,adj in enumerate(sample.hist_adj_list):
             adj = u.sparse_prepare_tensor(adj,torch_size = [self.num_nodes])
             sample.hist_adj_list[i] = adj.to(self.args.device)
@@ -367,7 +398,12 @@ class Trainer_new():
             node_mask = sample.node_mask_list[i]
             sample.node_mask_list[i] = node_mask.to(self.args.device).t() #transposed to have same dimensions as scorer
 
+        sample.label_sp["vals"] = torch.FloatTensor(self.data.nodes_labels)
+        n_nodes = sample.label_sp["vals"].shape[0]
+        sample.label_sp["idx"] = torch.LongTensor(list(range(n_nodes)))
+        # print("sample.label_sp", sample.label_sp, sample.label_sp.shape, np.nonzero(sample.label_sp))
         label_sp = self.ignore_batch_dim(sample.label_sp)
+        # print("label_sp", sample.label_sp["idx"], sample.label_sp["vals"])
 
         if self.args.task in ["link_pred", "edge_cls"]:
             label_sp['idx'] = label_sp['idx'].to(self.args.device).t()   ####### ALDO TO CHECK why there was the .t() -----> because I concatenate embeddings when there are pairs of them, the embeddings are row vectors after the transpose
@@ -396,7 +432,8 @@ class Trainer_new():
     def ignore_batch_dim(self, adj):
         if self.args.task in ["link_pred", "edge_cls"]:
             adj['idx'] = adj['idx'][0]
-        adj['vals'] = adj['vals'][0]
+        if self.args.task != "node_reg":
+            adj['vals'] = adj['vals'][0]
         return adj
 
     def save_node_embs_csv(self, nodes_embs, indexes, file_name):

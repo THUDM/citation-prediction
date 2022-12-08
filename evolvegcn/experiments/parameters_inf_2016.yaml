@@ -35,7 +35,7 @@ negative_mult_training: 50
 negative_mult_test: 100
 smart_neg_sampling: True
 seed: 1234
-target_measure: MAP # measure to define the best epoch F1, Precision, Recall, MRR, MAP
+target_measure: loss # measure to define the best epoch F1, Precision, Recall, MRR, MAP
 target_class: 1 # Target class to get the measure to define the best epoch (all, 0, 1)
 early_stop_patience: 50
 

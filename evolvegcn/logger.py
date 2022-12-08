@@ -92,6 +92,19 @@ class Logger():
         self.ep_time = self.lasttime
 
     def log_minibatch(self, predictions, true_classes, loss, **kwargs):
+        # print("target_measure", self.args.target_measure)
+        # print("task", self.args.task)
+        # if self.args.target_measure == "loss":
+
+        if self.args.task == "node_reg":
+            self.losses.append(loss) #loss.detach()
+            self.minibatch_done += 1
+            if self.minibatch_done % self.minibatch_log_interval==0:
+                partial_losses = torch.stack(self.losses)
+                logging.info(self.set+ ' batch %d / %d - partial loss %0.4f' % (self.minibatch_done, self.num_minibatches, partial_losses.mean()))
+                return
+            else:
+                return
 
         probs = torch.softmax(predictions,dim=1)[:,1]
         if self.set in ['TEST', 'VALID'] and self.args.task == 'link_pred':
@@ -155,6 +168,7 @@ class Logger():
         logging.info(self.set+' mean losses '+ str(self.losses.mean()))
         if self.args.target_measure=='loss' or self.args.target_measure=='Loss':
             eval_measure = self.losses.mean()
+            return - eval_measure
 
         epoch_error = self.calc_epoch_metric(self.batch_sizes, self.errors)
         logging.info(self.set+' mean errors '+ str(epoch_error))
