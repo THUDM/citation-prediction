@@ -1,3 +1,5 @@
+import os
+import json
 import pandas as pd
 import csv
 import numpy as np
@@ -7,63 +9,104 @@ from tqdm import tqdm
 
 def gen_test_author_per_year_citation_30(pred_year=2016):
     author_to_year_to_citation = dd(lambda: dd(int))
-    a_list = []
-    a_set = set()
-    with open("data/{}/raw/citation_test.txt".format(pred_year)) as rf:
-        for line in tqdm(rf):
-            a_idx, author_name = line.strip().split("\t")
-            a_list.append(author_name)
-            a_set.add(author_name)
+    if pred_year == 2016:
+        a_list = []
+        a_set = set()
+        with open("data/{}/raw/citation_test.txt".format(pred_year)) as rf:
+            for line in tqdm(rf):
+                a_idx, author_name = line.strip().split("\t")
+                a_list.append(author_name)
+                a_set.add(author_name)
 
-    paper_id_to_author = dd(set)
+        paper_id_to_author = dd(set)
 
-    cur_paper_dict = {}
-    with open("data/{}/raw/paper.txt".format(pred_year)) as rf:
-        for line in tqdm(rf):
-            if line.startswith("#*"):
-                if "pid" in cur_paper_dict and "authors" in cur_paper_dict:
-                    paper_id_to_author[cur_paper_dict["pid"]] = cur_paper_dict["authors"]
-                cur_paper_dict = {}
-            elif line.startswith("#index"):
-                cur_pid = line.strip().split()[-1][6:]
-                cur_paper_dict["pid"] = cur_pid
-            elif line.startswith("#@"):
-                cur_paper_dict["authors"] = line.strip()[2:].split(", ")
-    # print(paper_id_to_author)
+        cur_paper_dict = {}
+        with open("data/{}/raw/paper.txt".format(pred_year)) as rf:
+            for line in tqdm(rf):
+                if line.startswith("#*"):
+                    if "pid" in cur_paper_dict and "authors" in cur_paper_dict:
+                        paper_id_to_author[cur_paper_dict["pid"]] = cur_paper_dict["authors"]
+                    cur_paper_dict = {}
+                elif line.startswith("#index"):
+                    cur_pid = line.strip().split()[-1][6:]
+                    cur_paper_dict["pid"] = cur_pid
+                elif line.startswith("#@"):
+                    cur_paper_dict["authors"] = line.strip()[2:].split(", ")
+        # print(paper_id_to_author)
 
-    # raise
-    
-    cur_paper_dict = {}
-    with open("data/{}/raw/paper.txt".format(pred_year)) as rf:
-        for line in tqdm(rf):
-            if line.startswith("#*"):
-                if "references" in cur_paper_dict:
-                    # print("here1")
-                    for ref in cur_paper_dict["references"]:
-                        # print("here2")
-                        if ref in paper_id_to_author:
-                            # print("here3")
-                            for author in paper_id_to_author[ref]:
-                                # print("here4")
-                                if author in a_set:
-                                    # print("here5")
-                                    author_to_year_to_citation[author][cur_paper_dict["year"]] += 1
-                cur_paper_dict = {}
-            elif line.startswith("#index"):
-                cur_pid = line.strip().split()[-1][6:]
-                cur_paper_dict["pid"] = cur_pid
-            elif line.startswith("#t"):
-                cur_paper_dict["year"] = int(line.strip()[2:])
-            elif line.startswith("#%"):
-                if "references" in cur_paper_dict:
-                    cur_paper_dict["references"].append(line.strip()[2:])
-                else:
-                    cur_paper_dict["references"] = [line.strip()[2:]]
+        # raise
+        
+        cur_paper_dict = {}
+        with open("data/{}/raw/paper.txt".format(pred_year)) as rf:
+            for line in tqdm(rf):
+                if line.startswith("#*"):
+                    if "references" in cur_paper_dict:
+                        # print("here1")
+                        for ref in cur_paper_dict["references"]:
+                            # print("here2")
+                            if ref in paper_id_to_author:
+                                # print("here3")
+                                for author in paper_id_to_author[ref]:
+                                    # print("here4")
+                                    if author in a_set:
+                                        # print("here5")
+                                        author_to_year_to_citation[author][cur_paper_dict["year"]] += 1
+                    cur_paper_dict = {}
+                elif line.startswith("#index"):
+                    cur_pid = line.strip().split()[-1][6:]
+                    cur_paper_dict["pid"] = cur_pid
+                elif line.startswith("#t"):
+                    cur_paper_dict["year"] = int(line.strip()[2:])
+                elif line.startswith("#%"):
+                    if "references" in cur_paper_dict:
+                        cur_paper_dict["references"].append(line.strip()[2:])
+                    else:
+                        cur_paper_dict["references"] = [line.strip()[2:]]
 
-    with open("data/{}/processed/cnt_test_30_new.csv".format(pred_year), "w") as wf:
-        wf.write("author_name," + ",".join([str(i) for i in range(1982, 2012)]) + "\n")
-        for author in tqdm(a_list):
-            wf.write(author + "," + ",".join([str(author_to_year_to_citation[author][i]) for i in range(1982, 2012)]) + "\n")
+        with open("data/{}/processed/cnt_test_30_new.csv".format(pred_year), "w") as wf:
+            wf.write("author_name," + ",".join([str(i) for i in range(1982, 2012)]) + "\n")
+            for author in tqdm(a_list):
+                wf.write(author + "," + ",".join([str(author_to_year_to_citation[author][i]) for i in range(1982, 2012)]) + "\n")
+    elif pred_year == 2022:
+        paper_dict = {}
+        print("loading dblp papers...")
+        with open("data/2022/raw/dblp_papers_before_2017.json") as rf:
+            papers = json.load(rf)
+        print("dblp papers loaded")
+
+        for paper in tqdm(papers):
+            paper_dict[paper["_id"]] = paper
+
+        aids_test = []
+        with open("data/2022/processed/authors_test.json") as rf:
+            for line in rf:
+                aids_test.append(json.loads(line)["id"])
+        aids_set = set(aids_test)
+        
+        for paper in tqdm(papers):
+            cur_refs = paper.get("references", [])
+            if len(cur_refs) == 0:
+                continue
+            cur_year = paper["year"]
+            for ref_id in cur_refs:
+                ref_paper = paper_dict.get(ref_id, None)
+                if ref_paper is None:
+                    continue
+                ref_authors = ref_paper.get("authors", [])
+                for a in ref_authors:
+                    cur_aid = a.get("_id", None)
+                    if cur_aid is None:
+                        continue
+                    if cur_aid in aids_set:
+                        author_to_year_to_citation[cur_aid][cur_year] += 1
+        with open("data/2022/processed/cnt_test_30_new.csv", "w") as wf:
+            wf.write("author_id,total_citation," + ",".join([str(i) for i in range(1987, 2017)]) + "\n")
+            for author in tqdm(aids_test):
+                cur_total_citation = sum(author_to_year_to_citation[author].values())
+                wf.write(author + "," + str(cur_total_citation) + "," + ",".join([str(author_to_year_to_citation[author].get(i, 0)) for i in range(1987, 2017)]) + "\n")
+
+    else:
+        raise ValueError("pred_year should be 2016 or 2022")
 
 
 def feature_extraction(pred_year=2016):
@@ -503,8 +546,38 @@ def gen_dynamic_graph_data(pred_year=2016):
     np.save("data/{}/processed/author_features_all.npy".format(pred_year), author_features)
 
 
+def split_data_author_inf_2022():
+    with open("data/2022/raw/gs_citation_2022_result.json") as rf:
+        all_gs_authors = []
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            all_gs_authors.append(cur_author)
+
+    np.random.seed(2022)
+    np.random.shuffle(all_gs_authors)
+    n_authors = len(all_gs_authors)
+    authors_train = all_gs_authors[: int(n_authors * 0.6)]
+    authors_valid = all_gs_authors[int(n_authors * 0.6): int(n_authors * 0.8)]
+    authors_test = all_gs_authors[int(n_authors * 0.8):]
+
+    out_dir = "data/2022/processed/"
+    os.makedirs(out_dir, exist_ok=True)
+    with open(out_dir + "authors_train.json", 'w') as f:
+        for author in authors_train:
+            f.write(json.dumps(author) + "\n")
+    
+    with open(out_dir + "authors_valid.json", 'w') as f:
+        for author in authors_valid:
+            f.write(json.dumps(author) + "\n")
+    
+    with open(out_dir + "authors_test.json", 'w') as f:
+        for author in authors_test:
+            f.write(json.dumps(author) + "\n")
+
+
 if __name__ == "__main__":
-    # gen_test_author_per_year_citation_30(pred_year=2016)
+    gen_test_author_per_year_citation_30(pred_year=2022)
     # feature_extraction(pred_year=2016)
     # feature_extraction_seq(pred_year=2016)
-    gen_dynamic_graph_data(pred_year=2016)
+    # gen_dynamic_graph_data(pred_year=2016)
+    # split_data_author_inf_2022()
