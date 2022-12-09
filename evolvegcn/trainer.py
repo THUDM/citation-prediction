@@ -65,7 +65,7 @@ class Trainer():
             eval_train, nodes_embs = self.run_epoch(self.splitter.train, e, 'TRAIN', grad = True)
             if len(self.splitter.dev)>0 and e>self.args.eval_after_epochs:
                 eval_valid, _ = self.run_epoch(self.splitter.dev, e, 'VALID', grad = False)
-                if eval_valid>best_eval_valid:
+                if eval_valid > best_eval_valid:
                     best_eval_valid = eval_valid
                     epochs_without_impr = 0
                     print ('### w'+str(self.args.rank)+') ep '+str(e)+' - Best valid measure:'+str(eval_valid))
@@ -278,6 +278,7 @@ class Trainer_new():
 
             if len(self.splitter.test)>0 and eval_valid==best_eval_valid and e>self.args.eval_after_epochs:
                 eval_test, _ = self.run_epoch(self.splitter.test, e, 'TEST', grad = False)
+                print('eval_test', eval_test)
 
                 if self.args.save_node_embeddings:
                     self.save_node_embs_csv(nodes_embs, self.splitter.train_idx, log_file+'_train_nodeembs.csv.gz')

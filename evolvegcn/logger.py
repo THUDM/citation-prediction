@@ -38,6 +38,7 @@ class Logger():
         self.minibatch_log_interval = minibatch_log_interval
         self.eval_k_list = [10, 100, 1000]
         self.args = args
+        self.batches = []
 
 
     def get_log_file_name(self):
@@ -98,10 +99,11 @@ class Logger():
 
         if self.args.task == "node_reg":
             self.losses.append(loss) #loss.detach()
+            self.batch_sizes.append(predictions.size(0))
             self.minibatch_done += 1
             if self.minibatch_done % self.minibatch_log_interval==0:
                 partial_losses = torch.stack(self.losses)
-                logging.info(self.set+ ' batch %d / %d - partial loss %0.4f' % (self.minibatch_done, self.num_minibatches, partial_losses.mean()))
+                # logging.info(self.set+ ' batch %d / %d - partial loss %0.4f' % (self.minibatch_done, self.num_minibatches, partial_losses.mean()))
                 return
             else:
                 return
@@ -165,9 +167,12 @@ class Logger():
         eval_measure = 0
 
         self.losses = torch.stack(self.losses)
+        self.batch_sizes = torch.FloatTensor(self.batch_sizes).to(self.args.device)
         logging.info(self.set+' mean losses '+ str(self.losses.mean()))
         if self.args.target_measure=='loss' or self.args.target_measure=='Loss':
-            eval_measure = self.losses.mean()
+            # eval_measure = self.losses.mean()
+            eval_measure = torch.sum(self.losses*self.batch_sizes)/torch.sum(self.batch_sizes)
+            eval_measure = torch.sqrt(eval_measure)
             return - eval_measure
 
         epoch_error = self.calc_epoch_metric(self.batch_sizes, self.errors)
