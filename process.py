@@ -575,9 +575,293 @@ def split_data_author_inf_2022():
             f.write(json.dumps(author) + "\n")
 
 
+def feature_extraction_2022():
+    print("loading dblp papers...")
+    with open("data/2022/raw/dblp_papers_before_2017.json") as rf:
+        papers = json.load(rf)
+    print("dblp papers loaded") 
+
+    citation_by_year = dd(lambda: dd(int))  # citation_by_year[author][year] = ?
+    citation_by_paper = dd(lambda: dd(int))  # citation_by_paper[author][paper] = ?
+    total_citation = dd(int)  # total_citation[author] = ?
+    total_papers = dd(int)  # total_papers[author] = ?
+    h_index = dd(int)  # h_index[author] = ?
+
+    paper_to_author = {}  # paper_to_author[paper] = {}
+    meeting_to_paper = dd(lambda: dd(int))  # meeting_to_paper[meeting][paper] = ?
+    h_rank = {}  # h_rank[meeting] = ?
+    p_rank = {}
+    author_rank1 = dd(int)
+    author_rank2 = dd(int)
+    paper_dict = {}
+
+    for paper in tqdm(papers):
+        cur_authors = paper.get("authors", [])
+        cur_aids = []
+        for author in cur_authors:
+            aid = author.get("_id")
+            if aid is None:
+                continue
+            total_papers[aid] += 1
+            cur_aids.append(aid)
+        year = paper.get("year", 0)
+        meeting = paper.get("venue", {}).get("raw", "")
+        pid = paper["_id"]
+        paper_to_author[pid] = cur_aids
+        meeting_to_paper[meeting][pid] = 0
+        paper_dict[pid] = paper
+
+    print("Finish processing paper_to_author[] & total_papers[] ")
+
+    for paper in tqdm(papers):
+        cur_refs = paper.get("references", [])
+        year = paper.get("year", 0)
+        for ref in cur_refs:
+            ref_paper = paper_dict.get(ref, {})
+            cur_authors = ref_paper.get("authors", [])
+            for author in cur_authors:
+                aid = author.get("_id")
+                if aid is None:
+                    continue
+                if year >= 1997:
+                    citation_by_year[aid][year] += 1
+                total_citation[aid] += 1
+                citation_by_paper[aid][ref] += 1
+    print("Finish processing citation_by_year[] & total_citation[] & citation_by_paper[]")
+
+    true_citation = {}
+    rank_by_paper = {}
+    with open("data/2022/processed/authors_train.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aid = cur_author["id"]
+            true_citation[aid] = cur_author["Different"]
+    
+    with open("data/2022/processed/authors_valid.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aid = cur_author["id"]
+            true_citation[aid] = cur_author["Different"]
+
+    for paper in paper_to_author:
+        authors = [author for author in paper_to_author[paper] if author in true_citation]
+        counts = [true_citation[author] for author in authors]
+        if len(authors) > 0:
+            p_rank[paper] = np.min(np.array(counts))
+            index = np.where(np.array(counts) == p_rank[paper])
+            auth = authors[index[0][0]]
+            for x in index[0]:
+                if total_citation[authors[x]] != 0:
+                    auth = authors[x]
+                    break
+            if total_citation[auth] == 0:
+                p_rank[paper] = int(p_rank[paper] / total_papers[auth])
+            elif paper in citation_by_paper[auth]:
+                p_rank[paper] = int(citation_by_paper[auth][paper] * p_rank[paper] / total_citation[auth])
+            else:
+                p_rank[paper] = 0
+            for author in paper_to_author[paper]:
+                if author not in rank_by_paper:
+                    rank_by_paper[author] = {}
+                rank_by_paper[author][paper] = p_rank[paper]
+                # print("author", author, rank_by_paper[author])
+    print("Finish processing rank_by_paper")
+
+    true_citation_test = {}
+    with open("data/2022/processed/authors_test.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aid = cur_author["id"]
+            true_citation_test[aid] = cur_author["Different"]
+
+    aids_used = set(true_citation.keys()) | set(true_citation_test.keys())
+    for aid in tqdm(aids_used):
+        contain = rank_by_paper.get(aid)
+        try:
+            print("-----------------------", aid, contain, int(np.sum(np.array(list(contain.values())))))
+        except:
+            pass
+        if contain is None:
+            author_rank1[aid] = 50
+        else:
+            author_rank1[aid] = int(np.sum(np.array(list(contain.values()))))
+        print("author_rank1", author_rank1[aid])
+        papers = sorted(citation_by_paper[aid].items(), key=lambda x: x[1], reverse=True)
+        for i in range(len(papers)):
+            if i + 1 > papers[i][1]:
+                h_index[aid] = i
+                break
+    print("Finish processing h_index[] & author_rank1")
+
+    # for aid in tqdm(true_citation):
+    #     print("rank_by_paper train", aid, author_rank1[aid], rank_by_paper[aid])
+    
+    # for aid in tqdm(true_citation_test):
+    #     print("rank_by_paper test", aid, author_rank1[aid], rank_by_paper.get(aid))
+
+    for meeting in meeting_to_paper:
+        for paper in meeting_to_paper[meeting]:
+            if len(paper_to_author[paper]) == 0:
+                continue
+            tmp = paper_to_author[paper][0]
+            if paper in citation_by_paper[tmp]:
+                meeting_to_paper[meeting][paper] = citation_by_paper[tmp][paper]
+        papers = sorted(meeting_to_paper[meeting].items(), key=lambda x: x[1], reverse=True)
+        h_rank[meeting] = 0
+        for i in range(len(papers)):
+            if i + 1 > papers[i][1]:
+                h_rank[meeting] = i
+                break
+        for paper in meeting_to_paper[meeting]:
+            for author in paper_to_author[paper]:
+                author_rank2[author] += h_rank[meeting]
+    print("Finish processing author_rank2")
+
+    with open("data/2022/processed/train.csv", "w") as wf:
+        wf.write("id,author_rank1,author_rank2,total_citation,total_papers,h_index," +
+        ",".join([str(x) for x in range(1997, 2017)]) + ",result\n")
+        for aid in tqdm(true_citation):
+            wf.write(str(aid) + "," + str(author_rank1[aid]) + "," + str(author_rank2[aid]) + "," + str(total_citation[aid]) + "," + 
+            str(total_papers[aid]) + "," + str(h_index[aid]) + "," + ",".join([str(citation_by_year[aid][x]) for x in range(1997, 2017)]) + 
+            "," + str(true_citation[aid]) + "\n")
+    print("Finish writing train.csv")
+    
+
+    with open("data/2022/processed/test.csv", "w") as wf:
+        wf.write("id,author_rank1,author_rank2,total_citation,total_papers,h_index," +
+        ",".join([str(x) for x in range(1997, 2017)]) + ",result\n")
+        for aid in tqdm(true_citation_test):
+            wf.write(str(aid) + "," + str(author_rank1[aid]) + "," + str(author_rank2[aid]) + "," + str(total_citation[aid]) + "," + 
+            str(total_papers[aid]) + "," + str(h_index[aid]) + "," + ",".join([str(citation_by_year[aid][x]) for x in range(1997, 2017)]) + 
+            "," + str(true_citation_test[aid]) + "\n")
+    print("Finish writing test.csv")
+
+
+def feature_extraction_seq_2022():
+    print("loading dblp papers...")
+    with open("data/2022/raw/dblp_papers_before_2017.json") as rf:
+        papers = json.load(rf)
+    print("dblp papers loaded") 
+
+    citation_by_year = dd(lambda: dd(int))  # citation_by_year[author][year] = ?
+    citation_by_paper = dd(lambda: dd(int))  # citation_by_paper[author][paper] = ?
+    total_citation = dd(int)  # total_citation[author] = ?
+    total_papers = dd(int)  # total_papers[author] = ?
+    h_index = dd(int)  # h_index[author] = ?
+
+    paper_to_author = {}  # paper_to_author[paper] = {}
+    meeting_to_paper = dd(lambda: dd(int))  # meeting_to_paper[meeting][paper] = ?
+    h_rank = {}  # h_rank[meeting] = ?
+    p_rank = {}
+    author_rank1 = dd(int)
+    author_rank2 = dd(int)
+    paper_dict = {}    
+    n_pubs_by_year = dd(lambda: dd(set))
+    paper_to_year = {}
+
+    for paper in tqdm(papers):
+        pid = paper.get["_id"]
+        year = paper.get("year", 0)
+        aids = []
+        for author in paper.get("authors", []):
+            aid = author.get("_id")
+            if aid is None:
+                continue
+            total_papers[aid] += 1
+            aids.append(aid)
+        paper_to_author[pid] = aids
+        paper_to_year[pid] = year
+        for a in aids:
+            n_pubs_by_year[a][year].add(pid)
+        paper_dict[pid] = paper
+    print("Finish processing paper_to_author[] & total_papers[] ")
+    # print(n_pubs_by_year)
+    for a in tqdm(n_pubs_by_year):
+        print(a, n_pubs_by_year[a])
+    
+    for pid in tqdm(paper_dict):
+        paper = paper_dict[pid]
+        year = paper.get("year", 0)
+        if year == 0:
+            continue
+        for ref_id in paper.get("references", []):
+            if ref_id not in paper_to_author:
+                continue
+            for aid in paper_to_author[ref_id]:
+                citation_by_paper[aid][ref_id] += 1
+                citation_by_year[aid][year] += 1
+                total_citation[aid] += 1
+    print("Finish processing citation_by_year[] & citation_by_paper[]")
+
+    train_feature_seq = []
+    y_train = []
+    with open("data/2022/processed/authors_train.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aid = cur_author["id"]
+            y_train.append(cur_author["Different"])
+            cur_feature = np.zeros((20, 2))
+            for i in range(1997, 2017):
+                cur_feature[i - 1997][0] = citation_by_year[aid][i]
+                cur_feature[i - 1997][1] = len(n_pubs_by_year[aid][i])
+            train_feature_seq.append(cur_feature)
+            if len(train_feature_seq) % 1000 == 0:
+                print(cur_feature)
+    
+    with open("data/2022/processed/authors_valid.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aid = cur_author["id"]
+            y_train.append(cur_author["Different"])
+            cur_feature = np.zeros((20, 2))
+            for i in range(1997, 2017):
+                cur_feature[i - 1997][0] = citation_by_year[aid][i]
+                cur_feature[i - 1997][1] = len(n_pubs_by_year[aid][i])
+            train_feature_seq.append(cur_feature)
+            if len(train_feature_seq) % 1000 == 0:
+                print(cur_feature)
+
+    train_feature_seq = np.array(train_feature_seq)
+    y_train = np.array(y_train)
+
+    test_feature_seq = []
+    y_test = []
+    with open("data/2022/processed/authors_test.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aid = cur_author["id"]
+            y_test.append(cur_author["Different"])
+            cur_feature = np.zeros((20, 2))
+            for i in range(1997, 2017):
+                cur_feature[i - 1997][0] = citation_by_year[aid][i]
+                cur_feature[i - 1997][1] = len(n_pubs_by_year[aid][i])
+            test_feature_seq.append(cur_feature)
+            if len(test_feature_seq) % 1000 == 0:
+                print(cur_feature)
+    
+    test_feature_seq = np.array(test_feature_seq)
+    y_test = np.array(y_test)
+
+    pred_year = 2022
+    np.save("data/{}/processed/train_feature_seq.npy".format(pred_year), train_feature_seq)
+    np.save("data/{}/processed/test_feature_seq.npy".format(pred_year), test_feature_seq)
+    np.save("data/{}/processed/y_train.npy".format(pred_year), y_train)
+    np.save("data/{}/processed/y_test.npy".format(pred_year), y_test)
+
+
 if __name__ == "__main__":
-    gen_test_author_per_year_citation_30(pred_year=2022)
-    # feature_extraction(pred_year=2016)
-    # feature_extraction_seq(pred_year=2016)
+    pred_year = 2022
+    # gen_test_author_per_year_citation_30(pred_year=2022)
+    if pred_year == 2016:
+        # feature_extraction(pred_year=pred_year)
+        # feature_extraction_seq(pred_year=2016)
+        pass
+    elif pred_year == 2022:
+        # feature_extraction_2022()
+        feature_extraction_seq_2022()
+        pass
+    else:
+        raise NotImplementedError
+    
     # gen_dynamic_graph_data(pred_year=2016)
     # split_data_author_inf_2022()
