@@ -760,7 +760,7 @@ def feature_extraction_seq_2022():
     paper_to_year = {}
 
     for paper in tqdm(papers):
-        pid = paper.get["_id"]
+        pid = paper["_id"]
         year = paper.get("year", 0)
         aids = []
         for author in paper.get("authors", []):

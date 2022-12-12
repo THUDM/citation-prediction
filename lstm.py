@@ -67,15 +67,16 @@ def predict(pred_year=2016, dim=2):
     history = model.fit(x_train, y_train, batch_size=32, epochs=50, validation_split=0.2, verbose=1)
     y = model.predict(x_test, verbose=1)
 
-    with open("output/VanillaLSTM.txt", 'w', encoding='utf8') as fo:
-        with open("data/{}/raw/citation_test.txt".format(pred_year), 'r', encoding='utf8') as ft:
-            lines = ft.readlines()
-            for i in range(len(lines)):
-                words = lines[i].strip().split('\t')
-                _id = words[0]
-                fo.write(_id + '\t' + str(y[i, 0]) + '\n')
+    # with open("output/VanillaLSTM.txt", 'w', encoding='utf8') as fo:
+    #     with open("data/{}/raw/citation_test.txt".format(pred_year), 'r', encoding='utf8') as ft:
+    #         lines = ft.readlines()
+    #         for i in range(len(lines)):
+    #             words = lines[i].strip().split('\t')
+    #             _id = words[0]
+    #             fo.write(_id + '\t' + str(y[i, 0]) + '\n')
     rmse = math.sqrt(mean_squared_error(y_test.ravel(), y.ravel()))
     print("dim", dim, rmse)
 
+
 if __name__ == '__main__':
-    predict(pred_year=2016, dim=2)
+    predict(pred_year=2022, dim=2)
