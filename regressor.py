@@ -20,19 +20,17 @@ def predict(pred_year=2016):
     # 数据读入
     train = pd.read_csv('data/{}/processed/train.csv'.format(pred_year))
     test = pd.read_csv('data/{}/processed/test.csv'.format(pred_year))
-    x_train = train[['author_rank1', 'author_rank2', 'total_citation', 'total_papers', 'h_index',
-                     '1992', '1993', '1994', '1995', '1996',
-                     '1997', '1998', '1999', '2000', '2001',
-                     '2002', '2003', '2004', '2005', '2006',
-                     '2007', '2008', '2009', '2010', '2011'
-                     ]]
+    attrs = ['author_rank1', 'author_rank2', 'total_citation', 'total_papers', 'h_index']
+    if pred_year == 2016:
+        attrs += [str(y) for y in range(1992, 2012)]
+    elif pred_year == 2022:
+        attrs += [str(y) for y in range(1997, 2017)]
+    else:
+        raise NotImplementedError
+
+    x_train = train[attrs]
     y_train = train['result']
-    x_test = test[['author_rank1', 'author_rank2', 'total_citation', 'total_papers', 'h_index',
-                   '1992', '1993', '1994', '1995', '1996',
-                   '1997', '1998', '1999', '2000', '2001',
-                   '2002', '2003', '2004', '2005', '2006',
-                   '2007', '2008', '2009', '2010', '2011'
-                   ]]
+    x_test = test[attrs]
     y_test = test['result']
     print("All the data has been read")
 
@@ -91,14 +89,14 @@ def predict(pred_year=2016):
     # print([l[x] for x in np.argsort(-regressor.feature_importances_)])
 
     # 保存数据
-    with open("output/gbrt_output.txt", 'w', encoding='utf8') as fo:
-        with open("data/{}/raw/citation_test.txt".format(pred_year), 'r', encoding='utf8') as ft:
-            lines = ft.readlines()
-            for i in range(len(lines)):
-                words = lines[i].strip().split('\t')
-                _id = words[0]
-                fo.write(_id + '\t' + str(y[i]) + '\n')
+    # with open("output/gbrt_output.txt", 'w', encoding='utf8') as fo:
+    #     with open("data/{}/raw/citation_test.txt".format(pred_year), 'r', encoding='utf8') as ft:
+    #         lines = ft.readlines()
+    #         for i in range(len(lines)):
+    #             words = lines[i].strip().split('\t')
+    #             _id = words[0]
+    #             fo.write(_id + '\t' + str(y[i]) + '\n')
 
 
 if __name__ == '__main__':
-    predict()
+    predict(pred_year=2022)
