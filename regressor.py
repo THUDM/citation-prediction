@@ -77,6 +77,9 @@ def predict(pred_year=2016):
         y = regressor.predict(x_test)
         t3 = time.perf_counter()
         print("Predict time:", t3 - t2)
+        # n_test = len(y_test)
+        # for i in range(n_test):
+        #     print(y_test[i], y[i])
         rmse = math.sqrt(mean_squared_error(y_test, y))
         print("RMSE: ", rmse)
 
