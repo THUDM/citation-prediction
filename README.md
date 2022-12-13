@@ -2,7 +2,7 @@
 
 ## Prerequisites
 - Linux
-- Python 3.9
+- Python 3.7
 - PyTorch 1.10.0+cu111
 
 ## Getting Started
@@ -31,15 +31,15 @@ cd $project_path
 export CUDA_VISIBLE_DEVICES='?'  # specify which GPU(s) to be used
 
 # processing: set pred_year = 2016/2022 in process.py
-python process.py
+python process.py   
 
-# ARIMA
+# ARIMA: set pred_year = 2016/2022 below __main__ function
 python arima.py
 
-# regressor
+# regressor: set pred_year = 2016/2022 below __main__ function
 python regressor.py
 
-# LSTM
+# LSTM: set pred_year = 2016/2022 below __main__ function
 python lstm.py
 
 # EvolveGCN
