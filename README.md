@@ -24,3 +24,10 @@ pip install -r requirements.txt
 
 ### Dataset
 
+
+## How to run
+```bash
+cd $project_path
+export CUDA_VISIBLE_DEVICES='?'  # specify which GPU(s) to be used
+
+# processing: set pred_year = 2016/2022 in process.py
