@@ -965,19 +965,18 @@ def gen_dynamic_graph_data_2022():
 
 
 if __name__ == "__main__":
-    pred_year = 2022
-    # gen_test_author_per_year_citation_30(pred_year=2022)
+    pred_year = 2016
+    gen_test_author_per_year_citation_30(pred_year=pred_year)
     if pred_year == 2016:
-        # feature_extraction(pred_year=pred_year)
-        # feature_extraction_seq(pred_year=2016)
-        # gen_dynamic_graph_data(pred_year=2016)
+        feature_extraction(pred_year=pred_year)
+        feature_extraction_seq(pred_year=2016)
+        gen_dynamic_graph_data(pred_year=2016)
         pass
     elif pred_year == 2022:
-        # feature_extraction_2022()
-        # feature_extraction_seq_2022()
+        feature_extraction_2022()
+        feature_extraction_seq_2022()
         gen_dynamic_graph_data_2022()
         pass
     else:
         raise NotImplementedError
      
-    # split_data_author_inf_2022()
