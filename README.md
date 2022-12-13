@@ -22,8 +22,8 @@ Please install dependencies by
 pip install -r requirements.txt
 ```
 
-### Dataset
-
+## Dataset
+We provide two datasets for author citation prediction. The one is to predict author citations is _2016_ and another is to predict author citations in _2022_. The two datasets contain different authors. The datasets can be downloaded from [BaiduPan](https://pan.baidu.com/s/1O4Jr2NWGKLelnhQBjL50Zw?pwd=g5uk) with password g5uk. Please put the _data_ folder into the project directory.
 
 ## How to run
 ```bash
@@ -31,3 +31,27 @@ cd $project_path
 export CUDA_VISIBLE_DEVICES='?'  # specify which GPU(s) to be used
 
 # processing: set pred_year = 2016/2022 in process.py
+python process.py
+
+# ARIMA
+python arima.py
+
+# regressor
+python regressor.py
+
+# LSTM
+python lstm.py
+
+# EvolveGCN
+cd evolvegcn
+python run_exp_inf.py --config_file ./experiments/parameters_inf_2016.yaml
+python run_exp_inf.py --config_file ./experiments/parameters_inf_2022.yaml
+```
+
+### Results 
+
+Evaluation metrics: RSME
+
+|       | 2016 | 2022 |
+|-------|-------|-----|
+| ARIMA  |  |  |
