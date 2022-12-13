@@ -104,7 +104,7 @@ def build_dataset(args):
         elif args.data == 'sbm50':
             args.sbm_args = args.sbm50_args
         return sbm.sbm_dataset(args)
-    elif args.data == "inf_2016":
+    elif args.data == "inf_2016" or args.data == "inf_2022":
         return dataset.Author_Citation_Dataset(args)
     raise NotImplementedError
 

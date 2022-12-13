@@ -258,6 +258,8 @@ class Trainer_new():
         best_eval_valid = None
         eval_valid = 0
         epochs_without_impr = 0
+        best_epoch = -1
+        eval_test_final = None
 
         for e in tqdm(range(self.args.num_epochs)):
             eval_train, nodes_embs = self.run_epoch(self.splitter.train, e, 'TRAIN', grad = True)
@@ -279,12 +281,15 @@ class Trainer_new():
             if len(self.splitter.test)>0 and eval_valid==best_eval_valid and e>self.args.eval_after_epochs:
                 eval_test, _ = self.run_epoch(self.splitter.test, e, 'TEST', grad = False)
                 print('eval_test', eval_test)
+                best_epoch = e
+                eval_test_final = eval_test
 
                 if self.args.save_node_embeddings:
                     self.save_node_embs_csv(nodes_embs, self.splitter.train_idx, log_file+'_train_nodeembs.csv.gz')
                     self.save_node_embs_csv(nodes_embs, self.splitter.dev_idx, log_file+'_valid_nodeembs.csv.gz')
                     self.save_node_embs_csv(nodes_embs, self.splitter.test_idx, log_file+'_test_nodeembs.csv.gz')
 
+        print('best_epoch', best_epoch, "eval_test_final", eval_test_final)
 
     def run_epoch(self, split, epoch, set_name, grad):
         t0 = time.time()

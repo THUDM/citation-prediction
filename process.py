@@ -1,6 +1,7 @@
 import os
 import json
 import pandas as pd
+from copy import deepcopy
 import csv
 import numpy as np
 from collections import defaultdict as dd
@@ -414,7 +415,7 @@ def gen_dynamic_graph_data(pred_year=2016):
         "data/{}/raw/citation_result.txt".format(pred_year), header=None, sep='\t', encoding='utf8').values
     print("Finish loading data")
 
-    per_year_graphs = [dd(dict) for _ in range(1992, 2012)]
+    per_year_graphs = [dd(lambda: dd(int)) for _ in range(1992, 2012)]
 
     citation_by_year = {}  # citation_by_year[author][year] = ?
     citation_by_paper = {}  # citation_by_paper[author][paper] = ?
@@ -518,6 +519,8 @@ def gen_dynamic_graph_data(pred_year=2016):
                                 per_year_graphs[year - 1992][cur_authors[i]][cur_authors[j]] = 1
                             else:
                                 per_year_graphs[year - 1992][cur_authors[i]][cur_authors[j]] += 1
+                            # per_year_graphs[year - 1992][cur_authors[i]][cur_authors[j]] += 1
+                            # per_year_graphs[year - 1992][cur_authors[j]][cur_authors[i]] += 1
       
     
     with open("data/{}/processed/dynamic_coauthor_graph.txt".format(pred_year), 'w') as f:
@@ -849,19 +852,132 @@ def feature_extraction_seq_2022():
     np.save("data/{}/processed/y_test.npy".format(pred_year), y_test)
 
 
+def gen_dynamic_graph_data_2022():
+    print("loading dblp papers...")
+    with open("data/2022/raw/dblp_papers_before_2017.json") as rf:
+        papers = json.load(rf)
+    print("dblp papers loaded") 
+
+    per_year_graphs = [dd(lambda: dd(int)) for _ in range(1997, 2017)]
+
+    citation_by_year = dd(lambda: dd(int))  # citation_by_year[author][year] = ?
+    citation_by_paper = dd(lambda: dd(int))  # citation_by_paper[author][paper] = ?
+    total_citation = dd(int)  # total_citation[author] = ?
+    total_papers = dd(int)  # total_papers[author] = ?
+    h_index = dd(int)  # h_index[author] = ?
+
+    paper_to_author = {}  # paper_to_author[paper] = {}
+    meeting_to_paper = dd(lambda: dd(int))  # meeting_to_paper[meeting][paper] = ?
+    h_rank = {}  # h_rank[meeting] = ?
+    p_rank = {}
+    author_rank1 = dd(int)
+    author_rank2 = dd(int)
+    paper_dict = {}    
+    n_pubs_by_year = dd(lambda: dd(set))
+    paper_to_year = {}
+
+    for paper in tqdm(papers):
+        pid = paper["_id"]
+        year = paper.get("year", 0)
+        aids = []
+        for author in paper.get("authors", []):
+            aid = author.get("_id")
+            if aid is None:
+                continue
+            total_papers[aid] += 1
+            aids.append(aid)
+        paper_to_author[pid] = aids
+        paper_to_year[pid] = year
+        for a in aids:
+            n_pubs_by_year[a][year].add(pid)
+        paper_dict[pid] = paper
+    print("Finish processing paper_to_author[] & total_papers[] ")
+
+    for pid in tqdm(paper_dict):
+        paper = paper_dict[pid]
+        year = paper.get("year", 0)
+        if year == 0:
+            continue
+        for ref_id in paper.get("references", []):
+            if ref_id not in paper_to_author:
+                continue
+            for aid in paper_to_author[ref_id]:
+                citation_by_paper[aid][ref_id] += 1
+                citation_by_year[aid][year] += 1
+                total_citation[aid] += 1
+    print("Finish processing citation_by_year[] & citation_by_paper[]")
+
+    aids_with_labels = set()
+    with open("data/2022/raw/gs_citation_2022_result.json") as rf:
+        for line in tqdm(rf):
+            cur_author = json.loads(line)
+            aids_with_labels.add(cur_author["id"])
+
+    aids_include = deepcopy(aids_with_labels)
+    for pid in tqdm(paper_dict):
+        paper = paper_dict[pid]
+        year = paper.get("year", 0)
+        if year == 0:
+            continue
+        cur_authors = paper_to_author[pid]
+        n_cur_authors = len(cur_authors)
+        for i in range(n_cur_authors):
+            for j in range(i + 1, n_cur_authors):
+                # if i == j:
+                    # continue
+                aid1 = cur_authors[i]
+                aid2 = cur_authors[j]
+                if aid1 in aids_with_labels or aid2 in aids_with_labels:
+                    aids_include.add(aid1)
+                    aids_include.add(aid2)
+                if year < 1997 or year >= 2017:
+                    continue
+                per_year_graphs[year - 1997][aid1][aid2] += 1
+                per_year_graphs[year - 1997][aid2][aid1] += 1
+
+    aids_sorted = sorted(aids_include)
+    aid_to_idx = {aid: idx for idx, aid in enumerate(aids_sorted)}
+
+    with open("data/2022/processed/dynamic_coauthor_graph.txt", "w") as wf:
+        wf.write("author_id\tcoauthor_id\tweight\tyear\n")
+        for year in range(1997, 2017):
+            for aid1 in per_year_graphs[year - 1997]:
+                for aid2 in per_year_graphs[year - 1997][aid1]:
+                    if aid1 not in aid_to_idx or aid2 not in aid_to_idx:
+                        continue
+                    wf.write("{}\t{}\t{}\t{}\n".format(aid_to_idx[aid1], aid_to_idx[aid2], 
+                    per_year_graphs[year - 1997][aid1][aid2], year))
+                    wf.flush()
+
+    with open("data/2022/processed/idx_to_name.txt", 'w') as f:
+        for i, aid in enumerate(aids_sorted):
+            f.write("{}\t{}\n".format(i, aid))
+            f.flush()
+    
+    a_idx_max = len(aids_sorted)
+    author_features = np.zeros((a_idx_max, 20, 2))
+    for aid in aid_to_idx:
+        for i in range(1997, 2017):
+            author_features[aid_to_idx[aid]][i-1997][0] = citation_by_year[aid].get(i, 0)
+            author_features[aid_to_idx[aid]][i-1997][1] = len(n_pubs_by_year[aid].get(i, set()))
+
+    np.save("data/2022/processed/author_features_all.npy", author_features)
+
+
 if __name__ == "__main__":
     pred_year = 2022
     # gen_test_author_per_year_citation_30(pred_year=2022)
     if pred_year == 2016:
         # feature_extraction(pred_year=pred_year)
         # feature_extraction_seq(pred_year=2016)
+        # gen_dynamic_graph_data(pred_year=2016)
         pass
     elif pred_year == 2022:
         # feature_extraction_2022()
-        feature_extraction_seq_2022()
+        # feature_extraction_seq_2022()
+        gen_dynamic_graph_data_2022()
         pass
     else:
         raise NotImplementedError
-    
-    # gen_dynamic_graph_data(pred_year=2016)
+     
     # split_data_author_inf_2022()

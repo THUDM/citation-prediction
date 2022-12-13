@@ -1,4 +1,5 @@
 from tqdm import tqdm
+import json
 from torch.utils.data import Dataset, DataLoader
 import torch
 import numpy as np
@@ -137,19 +138,42 @@ class Author_Inf_Splitter():
         year = tasker.data.year
         self.tasker = tasker
 
-        train_idx = []
-        with open("../data/{}/raw/citation_train.txt".format(year)) as rf:
-            for i, line in enumerate(tqdm(rf)):
-                if i == 0:
-                    continue
-                train_idx.append(int(line.strip().split()[0]))
-        
-        test_idx = []
-        with open("../data/{}/raw/citation_result.txt".format(year)) as rf:
-            for i, line in enumerate(tqdm(rf)):
-                if i == 0:
-                    continue
-                test_idx.append(int(line.strip().split()[0]))
+        if year == 2016:
+            train_idx = []
+            with open("../data/{}/raw/citation_train.txt".format(year)) as rf:
+                for i, line in enumerate(tqdm(rf)):
+                    if i == 0:
+                        continue
+                    train_idx.append(int(line.strip().split()[0]))
+            
+            test_idx = []
+            with open("../data/{}/raw/citation_result.txt".format(year)) as rf:
+                for i, line in enumerate(tqdm(rf)):
+                    if i == 0:
+                        continue
+                    test_idx.append(int(line.strip().split()[0]))
+        elif year == 2022:
+            train_idx = []
+            test_idx = []
+            aid_to_idx = tasker.data.name_to_idx
+
+            with open("../data/2022/processed/authors_train.json") as rf:
+                for line in tqdm(rf):
+                    cur_author = json.loads(line)
+                    aid = cur_author["id"]
+                    train_idx.append(aid_to_idx[aid])
+            
+            with open("../data/2022/processed/authors_valid.json") as rf:
+                for line in tqdm(rf):
+                    cur_author = json.loads(line)
+                    aid = cur_author["id"]
+                    train_idx.append(aid_to_idx[aid])
+            
+            with open("../data/2022/processed/authors_test.json") as rf:
+                for line in tqdm(rf):
+                    cur_author = json.loads(line)
+                    aid = cur_author["id"]
+                    test_idx.append(aid_to_idx[aid])
 
         # start = tasker.data.min_time + args.num_hist_steps #-1 + args.adj_mat_time_window
         start = tasker.data.min_time
