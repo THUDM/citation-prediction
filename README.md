@@ -23,7 +23,7 @@ pip install -r requirements.txt
 ```
 
 ## Dataset
-We provide two datasets for author citation prediction. The one is to predict author citations is _2016_ and another is to predict author citations in _2022_. The two datasets contain different authors. The datasets can be downloaded from [BaiduPan](https://pan.baidu.com/s/1O4Jr2NWGKLelnhQBjL50Zw?pwd=g5uk) with password g5uk. Please put the _data_ folder into the project directory.
+We provide two datasets for author citation prediction. The one is to predict author citations is _2016_ and another is to predict author citations in _2022_. The two datasets contain different authors. The datasets can be downloaded from [BaiduPan](https://pan.baidu.com/s/1O4Jr2NWGKLelnhQBjL50Zw?pwd=g5uk) with password g5uk or [data-2016](https://open-data-set.oss-cn-beijing.aliyuncs.com/oag-benchmark/influence-prediction/author-influence-prediction/data/2016.zip) & [data-2022](https://open-data-set.oss-cn-beijing.aliyuncs.com/oag-benchmark/influence-prediction/author-influence-prediction/data/2022.zip). Please put the _data_ folder into the project directory.
 
 ## How to run
 ```bash
