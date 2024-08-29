@@ -59,3 +59,15 @@ Evaluation metrics: RSME
 | GBRT | 553 | 21777 |
 | LSTM | 1034 | 25409 |
 | EvolveGCN | 969 | 22841 |
+
+## References
+🌟 If you find our work helpful, please leave us a star and cite our paper.
+```
+@inproceedings{zhang2024oag,
+  title={OAG-bench: a human-curated benchmark for academic graph mining},
+  author={Zhang, Fanjin and Shi, Shijie and Zhu, Yifan and Chen, Bo and Cen, Yukuo and Yu, Jifan and Chen, Yelin and Wang, Lulu and Zhao, Qingfei and Cheng, Yuqing and others},
+  booktitle={Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
+  pages={6214--6225},
+  year={2024}
+}
+```
