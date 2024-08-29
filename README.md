@@ -65,7 +65,7 @@ Evaluation metrics: RSME
 ```
 @inproceedings{zhang2024oag,
   title={OAG-bench: a human-curated benchmark for academic graph mining},
-  author={Zhang, Fanjin and Shi, Shijie and Zhu, Yifan and Chen, Bo and Cen, Yukuo and Yu, Jifan and Chen, Yelin and Wang, Lulu and Zhao, Qingfei and Cheng, Yuqing and others},
+  author={Fanjin Zhang and Shijie Shi and Yifan Zhu and Bo Chen and Yukuo Cen and Jifan Yu and Yelin Chen and Lulu Wang and Qingfei Zhao and Yuqing Cheng and Tianyi Han and Yuwei An and Dan Zhang and Weng Lam Tam and Kun Cao and Yunhe Pang and Xinyu Guan and Huihui Yuan and Jian Song and Xiaoyan Li and Yuxiao Dong and Jie Tang},
   booktitle={Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
   pages={6214--6225},
   year={2024}
